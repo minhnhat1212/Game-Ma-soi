@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.werewolf.client.ui.RoomController"
+           styleClass="root app-bg">
+
+<BorderPane styleClass="app-shell">
+   
+   <top>
+      <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar">
+         <Label fx:id="roomNameLabel" text="Phòng: " styleClass="logo-title"/>
+         <Region HBox.hgrow="ALWAYS"/>
+         <Label fx:id="roomInfoLabel" text="" styleClass="muted"/>
+         <Button fx:id="leaveButton" text="Rời phòng" onAction="#handleLeaveRoom" styleClass="button danger small"/>
+      </HBox>
+   </top>
+   
+   <center>
+      <SplitPane dividerPositions="0.7" style="-fx-background-color: transparent;">
+         <!-- Left: Danh sách người chơi -->
+         <VBox spacing="10" styleClass="card">
+            <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+            <Label text="Danh sách người chơi" styleClass="header-label" style="-fx-font-size: 16px;"/>
+            
+            <ListView fx:id="playerList" prefHeight="400" VBox.vgrow="ALWAYS"/>
+            
+            <HBox spacing="10" alignment="CENTER">
+               <Button fx:id="readyButton" text="Sẵn sàng" onAction="#handleReady" 
+                       styleClass="button success"/>
+               <Button fx:id="addBotButton" text="Thêm bot" onAction="#handleAddBot" 
+                       styleClass="button small"
+                       visible="false"/>
+               <Button fx:id="startButton" text="Bắt đầu game" onAction="#handleStartGame" 
+                       styleClass="button"
+                       visible="false"/>
+            </HBox>
+            
+            <Label fx:id="statusLabel" text="" wrapText="true" styleClass="muted"/>
+         </VBox>
+         
+         <!-- Right: Chat -->
+         <VBox spacing="10" styleClass="card">
+            <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
+            <Label text="Chat" styleClass="header-label" style="-fx-font-size: 16px;"/>
+            
+            <TextArea fx:id="chatArea" editable="false" prefHeight="400" VBox.vgrow="ALWAYS"
+                     style="-fx-font-size: 12px;"/>
+            
+            <HBox spacing="10">
+               <TextField fx:id="chatInput" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS"
+                         onAction="#handleSendChat"/>
+               <Button text="Gửi" onAction="#handleSendChat" 
+                      styleClass="button small"/>
+            </HBox>
+         </VBox>
+      </SplitPane>
+   </center>
+</BorderPane>
+</StackPane>

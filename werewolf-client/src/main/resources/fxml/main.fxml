@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<StackPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.werewolf.client.ui.MainScreenController"
+           styleClass="root app-bg">
+
+<BorderPane styleClass="app-shell">
+   
+   <top>
+      <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar">
+         <Label fx:id="userInfoLabel" text="Xin chào, " styleClass="logo-title"/>
+         <Region HBox.hgrow="ALWAYS"/>
+         <Button fx:id="refreshButton" text="Làm mới" onAction="#handleRefresh" styleClass="button small"/>
+         <Button fx:id="logoutButton" text="Đăng xuất" onAction="#handleLogout" styleClass="button danger small"/>
+      </HBox>
+   </top>
+   
+   <center>
+      <VBox spacing="14" styleClass="card">
+         <padding><Insets top="14" right="14" bottom="14" left="14"/></padding>
+
+         <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label text="Danh sách phòng" styleClass="header-label" style="-fx-font-size: 18px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="createRoomButton" text="Tạo phòng mới" onAction="#handleCreateRoom" 
+                    styleClass="button success"/>
+         </HBox>
+         
+         <TableView fx:id="roomTable" prefHeight="400" VBox.vgrow="ALWAYS">
+            <columns>
+               <TableColumn fx:id="idColumn" text="ID" prefWidth="50"/>
+               <TableColumn fx:id="nameColumn" text="Tên phòng" prefWidth="200"/>
+               <TableColumn fx:id="hostColumn" text="Chủ phòng" prefWidth="150"/>
+               <TableColumn fx:id="playersColumn" text="Người chơi" prefWidth="100"/>
+               <TableColumn fx:id="statusColumn" text="Trạng thái" prefWidth="100"/>
+               <TableColumn fx:id="actionColumn" text="Thao tác" prefWidth="100"/>
+            </columns>
+         </TableView>
+         
+         <Label fx:id="statusLabel" text="" styleClass="muted"/>
+      </VBox>
+   </center>
+</BorderPane>
+</StackPane>
