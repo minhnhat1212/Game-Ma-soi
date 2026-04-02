@@ -39,9 +39,13 @@ public class GameEngine {
     private Map<Integer, Integer> seerChecks = new ConcurrentHashMap<>();   // userId -> targetUserId
     // New Roles
     private Map<Integer, Integer> guardProtects = new ConcurrentHashMap<>(); // userId -> targetUserId
+    private Map<Integer, Integer> guardSelfProtects = new ConcurrentHashMap<>(); // userId -> userId (tự bảo vệ)
+    private Map<Integer, Integer> framedPlayers = new ConcurrentHashMap<>(); // wolfUserId -> framedUserId
     private boolean witchSaved = false;
     private Integer witchKilledId = null;
+    private Integer witchMiniReviveId = null; // Phù thủy hồi sinh tạm ai
     private Map<Integer, Integer> silencedUntilRound = new ConcurrentHashMap<>();
+    private Map<Integer, List<Integer>> seerIntuitionTargets = new ConcurrentHashMap<>(); // seerUserId -> target list
 
     // Hunter
     private boolean hunterPendingAction = false; // Hunter bị sói giết, chờ báo thù
@@ -115,10 +119,14 @@ public class GameEngine {
             playerVotes.clear();
             werewolfKills.clear();
             seerChecks.clear();
+            seerIntuitionTargets.clear();
             // Clear new role actions
             guardProtects.clear();
+            guardSelfProtects.clear();
+            framedPlayers.clear();
             witchSaved = false;
             witchKilledId = null;
+            witchMiniReviveId = null;
             // Reset hunter state
             hunterPendingAction = false;
             hunterId = null;
@@ -258,6 +266,42 @@ public class GameEngine {
     }
 
     /**
+     * Tiên tri dùng Trực giác — soi 2 người cùng lúc
+     * Kết quả: "Trong 2 người này có ít nhất 1 Sói không?"
+     */
+    public boolean seerIntuitionCheck(int seerUserId, int targetId1, int targetId2) {
+        lock.lock();
+        try {
+            if (currentPhase != GamePhase.NIGHT_SEER) {
+                throw new RuntimeException("Không đúng pha");
+            }
+
+            PlayerState seer = room.getPlayers().get(seerUserId);
+            if (seer == null || seer.getRole() != Role.SEER || !seer.isAlive()) {
+                throw new RuntimeException("Bạn không phải tiên tri hoặc đã chết");
+            }
+            if (seer.isSeerIntuitionUsed()) {
+                throw new RuntimeException("Đã dùng Trực giác rồi");
+            }
+
+            seer.setSeerIntuitionUsed(true);
+            List<Integer> targets = new ArrayList<>();
+            targets.add(targetId1);
+            targets.add(targetId2);
+            seerIntuitionTargets.put(seerUserId, targets);
+
+            // Trả kết quả: trong 2 người có Sói không?
+            PlayerState t1 = room.getPlayers().get(targetId1);
+            PlayerState t2 = room.getPlayers().get(targetId2);
+            boolean hasSrei = (t1 != null && t1.getRole() == Role.WEREWOLF) ||
+                              (t2 != null && t2.getRole() == Role.WEREWOLF);
+            return hasSrei;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * Xử lý hành động của bảo vệ
      */
     public void guardProtect(int guardUserId, int targetUserId) {
@@ -273,6 +317,32 @@ public class GameEngine {
             }
 
             guardProtects.put(guardUserId, targetUserId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Bảo vệ tự bảo vệ bản thân (dùng được 1 lần/game)
+     */
+    public void guardSelfProtect(int guardUserId) {
+        lock.lock();
+        try {
+            if (currentPhase != GamePhase.NIGHT_GUARD) {
+                throw new RuntimeException("Không đúng pha");
+            }
+
+            PlayerState guard = room.getPlayers().get(guardUserId);
+            if (guard == null || guard.getRole() != Role.GUARD || !guard.isAlive()) {
+                throw new RuntimeException("Bạn không phải bảo vệ hoặc đã chết");
+            }
+            if (guard.isGuardSelfProtectUsed()) {
+                throw new RuntimeException("Đã dùng Tự bảo vệ rồi");
+            }
+
+            guard.setGuardSelfProtectUsed(true);
+            guardSelfProtects.put(guardUserId, guardUserId); // Tự bảo vệ bản thân
+            guardProtects.put(guardUserId, guardUserId);
         } finally {
             lock.unlock();
         }
@@ -307,8 +377,47 @@ public class GameEngine {
                 witch.setHasKillPotion(false);
             } else if ("SILENCE".equals(action)) {
                 if (targetUserId == null) throw new RuntimeException("Chưa chọn mục tiêu");
-                silencedUntilRound.put(targetUserId, roundNumber);
+                PlayerState target = room.getPlayers().get(targetUserId);
+                if (target == null || !target.isAlive()) throw new RuntimeException("Mục tiêu không hợp lệ");
+                silencedUntilRound.put(targetUserId, roundNumber); // Câm trong lượt hiện tại
+            } else if ("REVIVE".equals(action)) {
+                // Hồi sinh tạm: người chết đêm nay được nói 1 lượt (nhưng vẫn chết sau đó)
+                if (witch.isWitchMiniReviveUsed()) throw new RuntimeException("Đã dùng Hồi sinh tạm rồi");
+                if (targetUserId == null) throw new RuntimeException("Chưa chọn mục tiêu");
+                witch.setWitchMiniReviveUsed(true);
+                witchMiniReviveId = targetUserId;
             }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Ma Sói dùng Frame — đánh lạc hướng tiên tri (1 lần/game)
+     * Người bị frame: nếu tiên tri soi thấy "Sói" dù thật ra là dân
+     */
+    public void werewolfFrame(int wolfUserId, int targetUserId) {
+        lock.lock();
+        try {
+            if (currentPhase != GamePhase.NIGHT_WOLF) {
+                throw new RuntimeException("Không đúng pha");
+            }
+
+            PlayerState wolf = room.getPlayers().get(wolfUserId);
+            if (wolf == null || wolf.getRole() != Role.WEREWOLF || !wolf.isAlive()) {
+                throw new RuntimeException("Bạn không phải Ma Sói hoặc đã chết");
+            }
+            if (wolf.isWerewolfFrameUsed()) {
+                throw new RuntimeException("Đã dùng Frame rồi");
+            }
+
+            PlayerState target = room.getPlayers().get(targetUserId);
+            if (target == null || !target.isAlive() || target.getRole() == Role.WEREWOLF) {
+                throw new RuntimeException("Mục tiêu không hợp lệ (phải là người sống và không phải sói)");
+            }
+
+            wolf.setWerewolfFrameUsed(true);
+            framedPlayers.put(wolfUserId, targetUserId);
         } finally {
             lock.unlock();
         }
@@ -446,8 +555,8 @@ public class GameEngine {
                     break;
 
                 case DAY_HUNTER:
-                    // Hết giờ mà Hunter chưa hành động -> bỏ qua, tiếp tục game
-                    hunterPendingAction = false;
+                    // Hết giờ mà Hunter chưa chọn -> auto kéo theo ngẫu nhiên 1 người sống
+                    autoResolveHunterShot();
                     proceedAfterHunter();
                     break;
 
@@ -536,23 +645,36 @@ public class GameEngine {
                 PlayerState dead = room.getPlayers().get(pid);
                 if (dead != null && dead.isAlive()) {
                     dead.setAlive(false);
-                    // Nếu người bị sói giết là Hunter -> kích hoạt quyền báo thù
-                    // (chỉ khi bị sói giết trực tiếp, không phải witch killed)
-                    if (dead.getRole() == Role.HUNTER && pid.equals(targetKilled)) {
-                        hunterPendingAction = true;
-                        hunterId = pid;
-                    }
+                    activateHunterRevengeIfNeeded(pid, dead);
                 }
             }
         } else {
             killedPlayerId = null;
         }
 
-        // Chuyển sang DAY_ANNOUNCE, rồi DAY_HUNTER (nếu cần), rồi DAY_CHAT
+        // Chuyển sang DAY_ANNOUNCE, rồi kiểm tra win, rồi DAY_HUNTER (nếu cần), rồi DAY_CHAT
         currentPhase = GamePhase.DAY_ANNOUNCE;
         scheduler.schedule(() -> {
             lock.lock();
             try {
+                // Kiểm tra thắng thua ngay sau đêm (sói có thể đã bằng hoặc vượt dân)
+                int wolves = 0, villagers = 0;
+                for (PlayerState p : room.getPlayers().values()) {
+                    if (p.isAlive()) {
+                        if (p.getRole() == Role.WEREWOLF) wolves++;
+                        else villagers++;
+                    }
+                }
+                if (wolves == 0) {
+                    winnerTeam = "VILLAGERS";
+                    endGame();
+                    return;
+                } else if (wolves >= villagers) {
+                    winnerTeam = "WEREWOLVES";
+                    endGame();
+                    return;
+                }
+
                 if (hunterPendingAction) {
                     // Hunter được báo thù trước khi thảo luận
                     currentPhase = GamePhase.DAY_HUNTER;
@@ -620,8 +742,9 @@ public class GameEngine {
             // Có người bị treo cổ
             hangedPlayerId = tiedPlayers.get(0);
             PlayerState hanged = room.getPlayers().get(hangedPlayerId);
-            if (hanged != null) {
+            if (hanged != null && hanged.isAlive()) {
                 hanged.setAlive(false);
+                activateHunterRevengeIfNeeded(hangedPlayerId, hanged);
             }
         }
         // Nếu tie thì không ai chết
@@ -629,15 +752,20 @@ public class GameEngine {
         // Lưu killedPlayerId để DAY_ANNOUNCE hiện thị
         killedPlayerId = hangedPlayerId;
 
-        // Kiểm tra hunter bị treo cổ: Hunter bị vote KHÔNG được báo thù (chỉ báo thù khi bị sói giết)
-        // -> Không kích hoạt hunterPendingAction ở đây
-
-        // Chuyển sang DAY_ANNOUNCE (5 giây), rồi kiểm tra thắng thua
+        // Chuyển sang DAY_ANNOUNCE (5 giây),
+        // nếu Hunter vừa chết thì chuyển DAY_HUNTER, ngược lại kiểm tra thắng thua
         currentPhase = GamePhase.DAY_ANNOUNCE;
         scheduler.schedule(() -> {
             lock.lock();
             try {
-                checkWinCondition();
+                if (hunterPendingAction) {
+                    currentPhase = GamePhase.DAY_HUNTER;
+                    timeRemaining = room.getPhaseDurationSeconds();
+                    startPhaseTimer();
+                    scheduleBotActions();
+                } else {
+                    checkWinCondition();
+                }
             } finally {
                 lock.unlock();
             }
@@ -693,17 +821,19 @@ public class GameEngine {
     }
 
     private void applyMatchRewards() {
-        Set<Integer> participants = new HashSet<>();
-        Set<Integer> winners = new HashSet<>();
+        ProgressionService progressionService = new ProgressionService(userRepository);
+
         boolean villagersWin = "VILLAGERS".equals(winnerTeam);
         boolean werewolvesWin = "WEREWOLVES".equals(winnerTeam);
 
+        Set<Integer> winners = new HashSet<>();
+        Map<Integer, PlayerState> participants = new HashMap<>();
+
         for (PlayerState player : room.getPlayers().values()) {
             int userId = player.getUserId();
-            if (roomService.isBot(userId)) {
-                continue;
-            }
-            participants.add(userId);
+            if (roomService.isBot(userId)) continue;
+
+            participants.put(userId, player);
             if (villagersWin && player.getRole() != Role.WEREWOLF) {
                 winners.add(userId);
             } else if (werewolvesWin && player.getRole() == Role.WEREWOLF) {
@@ -712,7 +842,7 @@ public class GameEngine {
         }
 
         if (!participants.isEmpty()) {
-            userRepository.applyMatchRewards(winners, participants);
+            progressionService.applyRewards(winners, participants);
         }
     }
 
@@ -747,17 +877,20 @@ public class GameEngine {
             update.setKilledPlayerId(killedPlayerId);
             update.setWinnerTeam(winnerTeam);
 
-            // Convert players
+            // Convert players — thêm trạng thái silenced
             List<PlayerDTO> playerDTOs = new ArrayList<>();
-            for (PlayerState player : room.getPlayers().values()) {
+            for (PlayerState ps : room.getPlayers().values()) {
                 PlayerDTO dto = new PlayerDTO(
-                    player.getUserId(),
-                    player.getDisplayName(),
-                    player.isReady(),
-                    player.getRole(),
-                    player.isAlive(),
-                    player.getUserId() == room.getHostUserId()
+                    ps.getUserId(),
+                    ps.getDisplayName(),
+                    ps.isReady(),
+                    ps.getRole(),
+                    ps.isAlive(),
+                    ps.getUserId() == room.getHostUserId()
                 );
+                // Đánh dấu bị câm chat
+                int mutedRound = silencedUntilRound.getOrDefault(ps.getUserId(), -1);
+                dto.setSilenced(mutedRound == roundNumber);
                 playerDTOs.add(dto);
             }
             update.setPlayers(playerDTOs);
@@ -768,7 +901,7 @@ public class GameEngine {
             // Kiểm tra user có thể hành động không
             PlayerState player = room.getPlayers().get(userId);
             boolean canAct = false;
-            if (player != null && player.isAlive()) {
+            if (player != null) {
                 switch (currentPhase) {
                     case NIGHT_WOLF:
                         canAct = player.getRole() == Role.WEREWOLF && !werewolfKills.containsKey(userId);
@@ -804,6 +937,7 @@ public class GameEngine {
                         canAct = true; // Luôn cho phép vote / đổi vote nếu còn sống
                         break;
                     case DAY_HUNTER:
+                        // Hunter vẫn được hành động dù đã chết
                         canAct = player.getRole() == Role.HUNTER && hunterPendingAction && userId == hunterId;
                         break;
                     case WAITING:
@@ -814,9 +948,39 @@ public class GameEngine {
                         canAct = false;
                         break;
                 }
+                // Ở các pha khác DAY_HUNTER thì người đã chết không được hành động
+                if (!player.isAlive() && currentPhase != GamePhase.DAY_HUNTER) {
+                    canAct = false;
+                }
             }
             update.setCanAct(canAct);
             update.setHunterMustAct(hunterPendingAction && player != null && player.getRole() == Role.HUNTER && userId == hunterId);
+
+            // === Flags kỹ năng đặc biệt (chỉ cho chính player đó) ===
+            if (player != null && player.isAlive()) {
+                Role role = player.getRole();
+
+                // Bảo vệ: tự bảo vệ
+                if (role == Role.GUARD) {
+                    update.setGuardCanSelfProtect(!player.isGuardSelfProtectUsed());
+                    update.setGuardSelfProtectUsed(player.isGuardSelfProtectUsed());
+                }
+                // Tiên tri: trực giác
+                if (role == Role.SEER) {
+                    update.setSeerHasIntuition(!player.isSeerIntuitionUsed());
+                    update.setSeerIntuitionUsed(player.isSeerIntuitionUsed());
+                }
+                // Ma Sói: frame
+                if (role == Role.WEREWOLF) {
+                    update.setWerewolfCanFrame(!player.isWerewolfFrameUsed());
+                    update.setWerewolfFrameUsed(player.isWerewolfFrameUsed());
+                }
+                // Phù thủy: hồi sinh tạm
+                if (role == Role.WITCH) {
+                    update.setWitchHasMiniRevive(!player.isWitchMiniReviveUsed());
+                    update.setWitchMiniReviveUsed(player.isWitchMiniReviveUsed());
+                }
+            }
 
             return update;
         } finally {
@@ -824,12 +988,19 @@ public class GameEngine {
         }
     }
 
+
     /**
-     * Lấy kết quả soi của tiên tri
+     * Lấy kết quả soi của tiên tri — có tính frame
      */
     public boolean getSeerResult(int seerUserId, int targetUserId) {
         PlayerState target = room.getPlayers().get(targetUserId);
-        return target != null && target.getRole() == Role.WEREWOLF;
+        if (target == null) return false;
+
+        // Kiểm tra target có bị frame không
+        boolean isFramed = framedPlayers.containsValue(targetUserId);
+        if (isFramed) return true; // Frame làm tiên tri thấy "Sói" dù thật ra dân
+
+        return target.getRole() == Role.WEREWOLF;
     }
 
     public boolean canChat(int userId) {
@@ -847,5 +1018,31 @@ public class GameEngine {
 
     public void shutdown() {
         scheduler.shutdown();
+    }
+
+    private void activateHunterRevengeIfNeeded(Integer deadUserId, PlayerState deadPlayer) {
+        if (deadPlayer != null && deadPlayer.getRole() == Role.HUNTER && !hunterPendingAction) {
+            hunterPendingAction = true;
+            hunterId = deadUserId;
+        }
+    }
+
+    private void autoResolveHunterShot() {
+        if (!hunterPendingAction || hunterId == null) {
+            return;
+        }
+
+        List<PlayerState> candidates = new ArrayList<>();
+        for (PlayerState player : room.getPlayers().values()) {
+            if (player.isAlive() && player.getUserId() != hunterId) {
+                candidates.add(player);
+            }
+        }
+
+        if (!candidates.isEmpty()) {
+            PlayerState randomTarget = candidates.get(new Random().nextInt(candidates.size()));
+            randomTarget.setAlive(false);
+        }
+        hunterPendingAction = false;
     }
 }

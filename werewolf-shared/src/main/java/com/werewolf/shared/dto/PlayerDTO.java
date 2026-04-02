@@ -9,6 +9,7 @@ public class PlayerDTO {
     private Role role; // NULL nếu game chưa start
     private boolean alive; // NULL nếu game chưa start
     private boolean isHost;
+    private boolean silenced; // Đang bị câm chat không
 
     public PlayerDTO() {
     }
@@ -68,5 +69,13 @@ public class PlayerDTO {
 
     public void setHost(boolean host) {
         isHost = host;
+    }
+
+    public boolean isSilenced() {
+        return silenced;
+    }
+
+    public void setSilenced(boolean silenced) {
+        this.silenced = silenced;
     }
 }

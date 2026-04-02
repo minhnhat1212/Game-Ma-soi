@@ -355,19 +355,44 @@ public class ClientHandler implements Runnable {
                 case "SEER_CHECK":
                     currentGameEngine.seerCheck(currentUser.getId(), request.getTargetUserId());
                     boolean isWerewolf = currentGameEngine.getSeerResult(currentUser.getId(), request.getTargetUserId());
-                    sendMessage(new SystemMessage("Kết quả soi: " + (isWerewolf ? "Là Sói" : "Không phải Sói")));
+                    sendMessage(new SystemMessage("Kết quả soi: " + (isWerewolf ? "⚠️ Là Sói!" : "✅ Không phải Sói")));
+                    break;
+                case "SEER_INTUITION":
+                    // Trực giác: soi 2 người cùng lúc (targetUserId = id1, target2UserId = id2 trong JSON extra)
+                    int target1 = request.getTargetUserId();
+                    int target2 = request.getTarget2UserId();
+                    boolean hasSroi = currentGameEngine.seerIntuitionCheck(currentUser.getId(), target1, target2);
+                    sendMessage(new SystemMessage("🔮 Trực giác: Trong 2 người được chọn — "
+                        + (hasSroi ? "⚠️ CÓ Sói!" : "✅ KHÔNG có Sói")));
                     break;
                 case "GUARD_PROTECT":
                     currentGameEngine.guardProtect(currentUser.getId(), request.getTargetUserId());
+                    sendMessage(new SystemMessage("🛡️ Đã bảo vệ thành công!"));
+                    break;
+                case "GUARD_SELF":
+                    currentGameEngine.guardSelfProtect(currentUser.getId());
+                    sendMessage(new SystemMessage("🛡️ Đã tự bảo vệ bản thân đêm nay!"));
                     break;
                 case "WITCH_KILL":
                     currentGameEngine.witchAction(currentUser.getId(), "KILL", request.getTargetUserId());
+                    sendMessage(new SystemMessage("🧪 Đã dùng thuốc độc!"));
                     break;
                 case "SAVE":
+                case "WITCH_SAVE":
                     currentGameEngine.witchAction(currentUser.getId(), "SAVE", request.getTargetUserId());
+                    sendMessage(new SystemMessage("💊 Đã dùng thuốc cứu!"));
                     break;
                 case "WITCH_SILENCE":
                     currentGameEngine.witchAction(currentUser.getId(), "SILENCE", request.getTargetUserId());
+                    sendMessage(new SystemMessage("🤫 Đã câm chat người này trong lượt ngày hôm nay!"));
+                    break;
+                case "WITCH_REVIVE":
+                    currentGameEngine.witchAction(currentUser.getId(), "REVIVE", request.getTargetUserId());
+                    sendMessage(new SystemMessage("✨ Đã dùng Hồi sinh tạm — người đó có thể nói 1 lượt!"));
+                    break;
+                case "WOLF_FRAME":
+                    currentGameEngine.werewolfFrame(currentUser.getId(), request.getTargetUserId());
+                    sendMessage(new SystemMessage("🎭 Đã frame người này — Tiên Tri sẽ thấy họ là Sói!"));
                     break;
                 case "HUNTER_SHOOT":
                     currentGameEngine.hunterShoot(currentUser.getId(), request.getTargetUserId());

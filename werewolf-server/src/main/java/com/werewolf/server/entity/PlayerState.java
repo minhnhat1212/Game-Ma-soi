@@ -18,6 +18,12 @@ public class PlayerState {
     private boolean hasSavePotion = true;
     private boolean hasKillPotion = true;
 
+    // Kỹ năng đặc biệt
+    private boolean guardSelfProtectUsed = false;  // Bảo vệ đã tự bảo vệ chưa
+    private boolean seerIntuitionUsed = false;     // Tiên tri đã dùng trực giác chưa
+    private boolean witchMiniReviveUsed = false;   // Phù thủy đã hồi sinh tạm chưa
+    private boolean werewolfFrameUsed = false;     // Sói đã frame người chưa
+
     public PlayerState() {
     }
 
@@ -100,4 +106,16 @@ public class PlayerState {
     public void setHasKillPotion(boolean hasKillPotion) {
         this.hasKillPotion = hasKillPotion;
     }
+
+    public boolean isGuardSelfProtectUsed() { return guardSelfProtectUsed; }
+    public void setGuardSelfProtectUsed(boolean v) { this.guardSelfProtectUsed = v; }
+
+    public boolean isSeerIntuitionUsed() { return seerIntuitionUsed; }
+    public void setSeerIntuitionUsed(boolean v) { this.seerIntuitionUsed = v; }
+
+    public boolean isWitchMiniReviveUsed() { return witchMiniReviveUsed; }
+    public void setWitchMiniReviveUsed(boolean v) { this.witchMiniReviveUsed = v; }
+
+    public boolean isWerewolfFrameUsed() { return werewolfFrameUsed; }
+    public void setWerewolfFrameUsed(boolean v) { this.werewolfFrameUsed = v; }
 }

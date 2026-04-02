@@ -3,61 +3,124 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
 
 <StackPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.werewolf.client.ui.RoomController"
            styleClass="root app-bg">
 
 <BorderPane styleClass="app-shell">
-   
+
+   <!-- TOP BAR -->
    <top>
-      <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar">
-         <Label fx:id="roomNameLabel" text="Phòng: " styleClass="logo-title"/>
+      <HBox spacing="14" alignment="CENTER_LEFT" styleClass="top-bar">
+
+         <!-- Back/Room info column -->
+         <VBox spacing="3" alignment="CENTER_LEFT">
+             <Label text="SẢNH PHÒNG" styleClass="section-label"/>
+             <Label fx:id="roomNameLabel" text="Đang tải..."
+                    style="-fx-font-size: 20px; -fx-font-weight: 900; -fx-text-fill: #fbbf24;
+                           -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.35), 10, 0, 0, 0);"/>
+         </VBox>
+
          <Region HBox.hgrow="ALWAYS"/>
-         <Label fx:id="roomInfoLabel" text="" styleClass="muted"/>
-         <Button fx:id="leaveButton" text="Rời phòng" onAction="#handleLeaveRoom" styleClass="button danger small"/>
+
+         <!-- Room info -->
+         <HBox spacing="8" alignment="CENTER">
+             <Label fx:id="roomInfoLabel" text=""
+                    style="-fx-text-fill: rgba(196,181,253,0.60); -fx-font-size: 12.5px;"/>
+         </HBox>
+
+         <!-- Leave button -->
+         <Button fx:id="leaveButton" text="✕  Rời Phòng" onAction="#handleLeaveRoom"
+                 styleClass="button danger small"/>
       </HBox>
    </top>
-   
+
+   <!-- CONTENT -->
    <center>
-      <SplitPane dividerPositions="0.7" style="-fx-background-color: transparent;">
-         <!-- Left: Danh sách người chơi -->
-         <VBox spacing="10" styleClass="card">
-            <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-            <Label text="Danh sách người chơi" styleClass="header-label" style="-fx-font-size: 16px;"/>
-            
-            <ListView fx:id="playerList" prefHeight="400" VBox.vgrow="ALWAYS"/>
-            
+      <SplitPane dividerPositions="0.60" styleClass="split-pane"
+                 style="-fx-padding: 16 0 0 0;">
+
+         <!-- LEFT: Player list -->
+         <VBox spacing="16" styleClass="card">
+            <padding><Insets top="18" right="18" bottom="18" left="18"/></padding>
+
+            <!-- Header -->
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Circle radius="5"
+                        style="-fx-fill: #a78bfa; -fx-effect: dropshadow(gaussian, rgba(167,139,250,0.65), 8, 0, 0, 0);"/>
+                <VBox spacing="2">
+                    <Label text="NGƯỜI CHƠI TRONG PHÒNG" styleClass="section-label"/>
+                    <Label text="Chờ mọi người sẵn sàng..."
+                           style="-fx-font-size: 11.5px; -fx-text-fill: rgba(196,181,253,0.40);"/>
+                </VBox>
+            </HBox>
+
+            <!-- Accent line -->
+            <Region styleClass="divider-accent" maxWidth="Infinity"/>
+
+            <!-- Player List -->
+            <ListView fx:id="playerList" VBox.vgrow="ALWAYS"
+                      style="-fx-background-color: transparent; -fx-border-color: transparent;"/>
+
+            <!-- Thin separator -->
+            <Region style="-fx-background-color: rgba(130,80,230,0.12); -fx-pref-height: 1;"/>
+
+            <!-- Action Buttons -->
             <HBox spacing="10" alignment="CENTER">
-               <Button fx:id="readyButton" text="Sẵn sàng" onAction="#handleReady" 
-                       styleClass="button success"/>
-               <Button fx:id="addBotButton" text="Thêm bot" onAction="#handleAddBot" 
-                       styleClass="button small"
-                       visible="false"/>
-               <Button fx:id="startButton" text="Bắt đầu game" onAction="#handleStartGame" 
-                       styleClass="button"
-                       visible="false"/>
+               <Button fx:id="readyButton" text="✔  Sẵn Sàng" onAction="#handleReady"
+                       styleClass="button success" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                       style="-fx-padding: 12 0;"/>
+               <Button fx:id="addBotButton" text="＋ Bot" onAction="#handleAddBot"
+                       styleClass="button small" visible="false"/>
+               <Button fx:id="startButton" text="⚔  BẮT ĐẦU GAME" onAction="#handleStartGame"
+                       styleClass="button gold" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                       visible="false" style="-fx-padding: 12 0;"/>
             </HBox>
-            
-            <Label fx:id="statusLabel" text="" wrapText="true" styleClass="muted"/>
+
+            <!-- Status -->
+            <Label fx:id="statusLabel" text="" wrapText="true"
+                   styleClass="muted" style="-fx-font-size: 11.5px;"/>
          </VBox>
-         
-         <!-- Right: Chat -->
-         <VBox spacing="10" styleClass="card">
-            <padding><Insets top="12" right="12" bottom="12" left="12"/></padding>
-            <Label text="Chat" styleClass="header-label" style="-fx-font-size: 16px;"/>
-            
-            <TextArea fx:id="chatArea" editable="false" prefHeight="400" VBox.vgrow="ALWAYS"
-                     style="-fx-font-size: 12px;"/>
-            
-            <HBox spacing="10">
+
+         <!-- RIGHT: Chat -->
+         <VBox spacing="0" styleClass="card">
+            <padding><Insets top="18" right="18" bottom="18" left="18"/></padding>
+
+            <!-- Chat Header -->
+            <HBox alignment="CENTER_LEFT" spacing="10" style="-fx-padding: 0 0 14 0;">
+                <Circle radius="5"
+                        style="-fx-fill: #34d399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.70), 8, 0, 0, 0);"/>
+                <Label text="PHÒNG CHAT" styleClass="section-label"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label text="TRỰC TUYẾN"
+                       style="-fx-background-color: rgba(52,211,153,0.14); -fx-background-radius: 20;
+                              -fx-border-radius: 20; -fx-border-color: rgba(52,211,153,0.35);
+                              -fx-border-width: 1; -fx-padding: 2 9 2 9;
+                              -fx-text-fill: #34d399; -fx-font-size: 10px; -fx-font-weight: 900;"/>
+            </HBox>
+
+            <!-- Accent line -->
+            <Region style="-fx-background-color: rgba(52,211,153,0.12); -fx-pref-height: 1;
+                           -fx-margin: 0 0 14 0;"/>
+
+            <Region prefHeight="10"/>
+
+            <TextArea fx:id="chatArea" editable="false" VBox.vgrow="ALWAYS" wrapText="true"
+                      style="-fx-font-size: 12.5px; -fx-font-family: 'Segoe UI';"/>
+
+            <!-- Chat input -->
+            <HBox spacing="8" style="-fx-padding: 14 0 0 0;">
                <TextField fx:id="chatInput" promptText="Nhập tin nhắn..." HBox.hgrow="ALWAYS"
-                         onAction="#handleSendChat"/>
-               <Button text="Gửi" onAction="#handleSendChat" 
-                      styleClass="button small"/>
+                          onAction="#handleSendChat"/>
+               <Button text="Gửi" onAction="#handleSendChat"
+                       styleClass="button small" style="-fx-min-width: 60px;"/>
             </HBox>
          </VBox>
+
       </SplitPane>
    </center>
+
 </BorderPane>
 </StackPane>

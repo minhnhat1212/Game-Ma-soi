@@ -3,6 +3,7 @@ package com.werewolf.client.ui;
 import com.werewolf.client.network.NetworkClient;
 import com.werewolf.shared.dto.*;
 import com.werewolf.shared.enums.GamePhase;
+import com.werewolf.shared.enums.RankSystem;
 import com.werewolf.shared.enums.Role;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -24,67 +25,74 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Controller cho màn hình chơi game
+ * Controller cho man hinh choi game - co day du ky nang dac biet va he thong rank
  */
 public class GameController {
-    @FXML
-    private Label phaseLabel;
-    @FXML
-    private Label timerLabel;
-    @FXML
-    private Label roundLabel;
-    @FXML
-    private Label phaseDescriptionLabel;
-    @FXML
-    private FlowPane playerPane;
-    @FXML
-    private VBox actionPanel;
-    @FXML
-    private Label actionDescriptionLabel;
-    @FXML
-    private ListView<PlayerDTO> targetList;
-    @FXML
-    private Button submitActionButton;
-    @FXML
-    private VBox voteResultPanel;
-    @FXML
-    private Label voteResultLabel;
-    @FXML
-    private VBox gameEndPanel;
-    @FXML
-    private Label winnerLabel;
-    @FXML
-    private TextArea chatArea;
-    @FXML
-    private TextField chatInput;
-    @FXML
-    private Label myRoleLabel;
-    @FXML
-    private Label statusLabel;
-    @FXML
-    private Label turnInfoLabel;
+    @FXML private Label phaseLabel;
+    @FXML private Label timerLabel;
+    @FXML private Label roundLabel;
+    @FXML private Label phaseDescriptionLabel;
+    @FXML private FlowPane playerPane;
+    @FXML private VBox actionPanel;
+    @FXML private Label actionDescriptionLabel;
+    @FXML private ListView<PlayerDTO> targetList;
+    @FXML private ListView<PlayerDTO> target2List;
+    @FXML private Button submitActionButton;
+    @FXML private VBox voteResultPanel;
+    @FXML private Label voteResultLabel;
+    @FXML private VBox gameEndPanel;
+    @FXML private Label winnerLabel;
+    @FXML private TextArea chatArea;
+    @FXML private TextField chatInput;
+    @FXML private Label myRoleLabel;
+    @FXML private Label statusLabel;
+    @FXML private Label turnInfoLabel;
+    @FXML private VBox specialAbilityPanel;
+    @FXML private VBox rewardPanel;
+
+    // Ky nang buttons
+    @FXML private Button guardSelfBtn;
+    @FXML private Button seerIntuitionBtn;
+    @FXML private Button wolfFrameBtn;
+    @FXML private Button witchReviveBtn;
+    @FXML private Button witchSilenceBtn;
+
+    // Reward labels
+    @FXML private Label xpGainedLabel;
+    @FXML private Label bonusXpLabel;
+    @FXML private Label coinsGainedLabel;
+    @FXML private Label rankLabel;
+    @FXML private ProgressBar xpProgressBar;
+    @FXML private Label xpProgressLabel;
 
     private NetworkClient networkClient;
     private Stage stage;
     private UserDTO currentUser;
-    private RoomDTO currentRoom;
     private GameStateUpdate currentGameState;
     private Role myRole;
     private int timeRemaining = 0;
-    /** Ghi nhận pha đã log vào chat (tránh spam mỗi giây). */
     private GamePhase lastChatPhase = null;
+
+    // Trang thai ky nang
+    private boolean seerIntuitionMode = false; // Dang chon 2 nguoi cho Truc giac
 
     private void applyTheme(Scene scene) {
         scene.getStylesheets().add(getClass().getResource("/css/style.css").toExternalForm());
     }
 
     public void initialize() {
-        // Hidden overlays should not keep layout footprint.
         actionPanel.managedProperty().bind(actionPanel.visibleProperty());
         voteResultPanel.managedProperty().bind(voteResultPanel.visibleProperty());
         gameEndPanel.managedProperty().bind(gameEndPanel.visibleProperty());
 
-        // Setup target list cell factory
+        if (specialAbilityPanel != null) {
+            specialAbilityPanel.managedProperty().bind(specialAbilityPanel.visibleProperty());
+        }
+        if (target2List != null) {
+            target2List.managedProperty().bind(target2List.visibleProperty());
+        }
+
+        // Cell factory cho targetList
         targetList.setCellFactory(listView -> new ListCell<PlayerDTO>() {
             @Override
             protected void updateItem(PlayerDTO player, boolean empty) {
@@ -92,40 +100,45 @@ public class GameController {
                 if (empty || player == null) {
                     setText(null);
                 } else {
-                    setText(player.getDisplayName() + (player.isAlive() ? " (Sống)" : " (Chết)"));
+                    String silenced = player.isSilenced() ? " [Cam chat]" : "";
+                    setText(player.getDisplayName() + (player.isAlive() ? " (Song)" : " (Chet)") + silenced);
                 }
             }
         });
+
+        if (target2List != null) {
+            target2List.setCellFactory(listView -> new ListCell<PlayerDTO>() {
+                @Override
+                protected void updateItem(PlayerDTO player, boolean empty) {
+                    super.updateItem(player, empty);
+                    if (empty || player == null) {
+                        setText(null);
+                    } else {
+                        setText(player.getDisplayName());
+                    }
+                }
+            });
+        }
     }
 
     public void setNetworkClient(NetworkClient networkClient) {
         this.networkClient = networkClient;
-        
-        // Set message listener
         networkClient.setMessageListener(message -> {
             Platform.runLater(() -> {
                 try {
                     handleServerMessage(message);
                 } catch (Throwable uiError) {
-                    System.err.println("[GameController] Lỗi xử lý message: " + uiError.getMessage());
+                    System.err.println("[GameController] Loi xu ly message: " + uiError.getMessage());
                     uiError.printStackTrace();
-                    showStatus("Lỗi xử lý dữ liệu game: " + uiError.getMessage(), true);
+                    showStatus("Loi xu ly du lieu game: " + uiError.getMessage(), true);
                 }
             });
         });
     }
 
-    public void setStage(Stage stage) {
-        this.stage = stage;
-    }
-
-    public void setCurrentUser(UserDTO user) {
-        this.currentUser = user;
-    }
-
-    public void setRoom(RoomDTO room) {
-        this.currentRoom = room;
-    }
+    public void setStage(Stage stage) { this.stage = stage; }
+    public void setCurrentUser(UserDTO user) { this.currentUser = user; }
+    public void setRoom(RoomDTO room) { /* kept for compatibility */ }
 
     public void initializeGame(GameStateUpdate initialState) {
         lastChatPhase = null;
@@ -134,17 +147,15 @@ public class GameController {
 
     private void updateGameState(GameStateUpdate update) {
         this.currentGameState = update;
-        
-        // Update phase info
+
         GamePhase phase = update.getPhase();
         phaseLabel.setText("Pha: " + phase.getDisplayName());
-        roundLabel.setText("Vòng: " + update.getRoundNumber());
-        
-        // Timer: chỉ hiển thị theo server (tránh lệch / đếm kép với tick server)
+        roundLabel.setText("Vong: " + update.getRoundNumber());
+
         timeRemaining = update.getTimeRemaining();
         updateTimer();
-        
-        // Find my role
+
+        // Lay vai tro cua ban
         if (update.getPlayers() != null && currentUser != null) {
             for (PlayerDTO player : update.getPlayers()) {
                 if (player.getUserId() == currentUser.getId()) {
@@ -156,16 +167,12 @@ public class GameController {
                 }
             }
         }
-        
-        // Update players display
+
         updatePlayersDisplay(update.getPlayers());
-        
-        // Handle different phases
         handlePhase(phase, update);
         updateTurnInfo(phase, update);
         maybeLogPhaseToChat(phase, update);
-        
-        // Handle game end
+
         if (phase == GamePhase.ENDED) {
             handleGameEnd(update);
         }
@@ -174,14 +181,12 @@ public class GameController {
     private void updateTimer() {
         int minutes = timeRemaining / 60;
         int seconds = timeRemaining % 60;
-        timerLabel.setText(String.format("Thời gian: %02d:%02d", minutes, seconds));
+        timerLabel.setText(String.format("Thoi gian: %02d:%02d", minutes, seconds));
     }
 
     private void updatePlayersDisplay(List<PlayerDTO> players) {
         playerPane.getChildren().clear();
-        
         if (players == null) return;
-        
         for (PlayerDTO player : players) {
             VBox playerCard = createPlayerCard(player);
             playerPane.getChildren().add(playerCard);
@@ -191,13 +196,8 @@ public class GameController {
     private VBox createPlayerCard(PlayerDTO player) {
         VBox card = new VBox(5);
         card.getStyleClass().add("player-card");
-        if (player.isAlive()) {
-            card.getStyleClass().add("alive");
-        } else {
-            card.getStyleClass().add("dead");
-        }
+        card.getStyleClass().add(player.isAlive() ? "alive" : "dead");
 
-        // Avatar (simple vector "image"): circle + first letter
         String dn = player.getDisplayName() != null ? player.getDisplayName().trim() : "?";
         String initial = dn.isEmpty() ? "?" : dn.substring(0, 1).toUpperCase();
         Circle avatar = new Circle(16);
@@ -208,152 +208,302 @@ public class GameController {
 
         Label nameLabel = new Label(player.getDisplayName());
         nameLabel.getStyleClass().add("player-name");
-        
-        Label statusLabel = new Label(player.isAlive() ? "Sống" : "Chết");
-        statusLabel.getStyleClass().add("player-status");
-        if (player.isAlive()) {
-             statusLabel.setStyle("-fx-text-fill: #55efc4;");
-        } else {
-             statusLabel.setStyle("-fx-text-fill: #ff7675;");
+
+        Label statusLbl = new Label(player.isAlive() ? "Song" : "Chet");
+        statusLbl.getStyleClass().add("player-status");
+        statusLbl.setStyle(player.isAlive() ? "-fx-text-fill: #55efc4;" : "-fx-text-fill: #ff7675;");
+
+        card.getChildren().addAll(avatarPane, nameLabel, statusLbl);
+
+        // Icon câm chat
+        if (player.isSilenced() && player.isAlive()) {
+            Label silenceLabel = new Label("[Cam chat]");
+            silenceLabel.setStyle("-fx-font-size: 9px; -fx-text-fill: #fd79a8; -fx-font-weight: bold;");
+            card.getChildren().add(silenceLabel);
         }
-        
-        card.getChildren().addAll(avatarPane, nameLabel, statusLabel);
-        
-        // Show role if player is dead or if it's my role
+
+        // Vai tro
         if (!player.isAlive() && player.getRole() != null) {
             Label roleLabel = new Label(player.getRole().getDisplayName());
             roleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #b2bec3;");
             card.getChildren().add(roleLabel);
-        } else if (player.getUserId() == currentUser.getId() && player.getRole() != null) {
+        } else if (currentUser != null && player.getUserId() == currentUser.getId() && player.getRole() != null) {
             Label roleLabel = new Label(player.getRole().getDisplayName());
             roleLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #ffd700; -fx-font-weight: bold;");
             card.getChildren().add(roleLabel);
         }
-        
+
         return card;
     }
 
     private void handlePhase(GamePhase phase, GameStateUpdate update) {
         actionPanel.setVisible(false);
         voteResultPanel.setVisible(false);
-        
+        hideAllAbilityButtons();
+        seerIntuitionMode = false;
+
         switch (phase) {
             case WAITING:
-                phaseDescriptionLabel.setText("Đang chờ trong phòng...");
+                phaseDescriptionLabel.setText("Dang cho trong phong...");
                 break;
             case STARTING:
-                phaseDescriptionLabel.setText("Game đang khởi động...");
+                phaseDescriptionLabel.setText("Game dang khoi dong...");
                 break;
-                
+
             case NIGHT_WOLF:
-                phaseDescriptionLabel.setText("Đêm - Ma Sói chọn người để giết");
+                phaseDescriptionLabel.setText("DEM - Ma Soi chon nguoi de giet");
                 if (myRole == Role.WEREWOLF && update.isCanAct()) {
-                    showActionPanel("Chọn người để giết:", "KILL", update.getPlayers());
-                }
-                break;
-                
-            case NIGHT_GUARD:
-                phaseDescriptionLabel.setText("Đêm - Bảo vệ chọn người bảo vệ");
-                if (myRole == Role.GUARD && update.isCanAct()) {
-                    showActionPanel("Chọn người để bảo vệ:", "GUARD_PROTECT", update.getPlayers());
-                }
-                break;
-                
-            case NIGHT_WITCH:
-                phaseDescriptionLabel.setText("Đêm - Phù thủy hành động (cứu, độc, câm chat)");
-                if (myRole == Role.WITCH && update.isCanAct()) {
-                    Integer killedId = update.getKilledPlayerId();
-                    if (killedId != null) {
-                         String killedName = findPlayerName(killedId, update.getPlayers());
-                         showWitchActionPanel(killedName);
-                    } else {
-                         showWitchActionPanel(null);
+                    showActionPanel("Chon nguoi de giet:", "KILL", update.getPlayers());
+                    // Frame ability
+                    if (update.isWerewolfCanFrame() && !update.isWerewolfFrameUsed()) {
+                        showAbilityPanel();
+                        setButtonVisible(wolfFrameBtn, true);
                     }
                 }
                 break;
 
-            case NIGHT_SEER:
-                phaseDescriptionLabel.setText("Đêm - Tiên Tri soi người");
-                if (myRole == Role.SEER && update.isCanAct()) {
-                    showActionPanel("Chọn người để soi:", "SEER_CHECK", update.getPlayers());
+            case NIGHT_GUARD:
+                phaseDescriptionLabel.setText("DEM - Bao ve chon nguoi bao ve");
+                if (myRole == Role.GUARD && update.isCanAct()) {
+                    showActionPanel("Chon nguoi de bao ve:", "GUARD_PROTECT", update.getPlayers());
+                    // Self-protect ability
+                    if (update.isGuardCanSelfProtect() && !update.isGuardSelfProtectUsed()) {
+                        showAbilityPanel();
+                        setButtonVisible(guardSelfBtn, true);
+                    }
                 }
                 break;
-                
+
+            case NIGHT_WITCH:
+                phaseDescriptionLabel.setText("DEM - Phu thuy hanh dong");
+                if (myRole == Role.WITCH && update.isCanAct()) {
+                    Integer killedId = update.getKilledPlayerId();
+                    String killedName = killedId != null ? findPlayerName(killedId, update.getPlayers()) : null;
+                    showWitchActionPanel(killedName, update);
+                }
+                break;
+
+            case NIGHT_SEER:
+                phaseDescriptionLabel.setText("DEM - Tien Tri soi nguoi");
+                if (myRole == Role.SEER && update.isCanAct()) {
+                    showActionPanel("Chon nguoi de soi:", "SEER_CHECK", update.getPlayers());
+                    // Intuition ability
+                    if (update.isSeerHasIntuition() && !update.isSeerIntuitionUsed()) {
+                        showAbilityPanel();
+                        setButtonVisible(seerIntuitionBtn, true);
+                    }
+                }
+                break;
+
             case DAY_ANNOUNCE:
-                phaseDescriptionLabel.setText("Ngày - Công bố người chết");
                 if (update.getKilledPlayerId() != null) {
                     String killedName = findPlayerName(update.getKilledPlayerId(), update.getPlayers());
-                    phaseDescriptionLabel.setText("Người chết: " + killedName);
+                    phaseDescriptionLabel.setText("Nguoi chet: " + killedName);
                 } else {
-                    phaseDescriptionLabel.setText("Không ai chết đêm qua / lượt vừa rồi");
+                    phaseDescriptionLabel.setText("Khong ai chet dem qua / luot vua roi");
                 }
                 break;
 
             case DAY_HUNTER:
-                phaseDescriptionLabel.setText("Thợ Săn bị giết — chọn người kéo theo!");
+                phaseDescriptionLabel.setText("Tho San bi giet — chon nguoi keo theo!");
                 if (myRole == Role.HUNTER && update.isCanAct()) {
-                    showActionPanel("Chọn người để kéo theo:", "HUNTER_SHOOT", update.getPlayers());
+                    showActionPanel("Chon nguoi de keo theo:", "HUNTER_SHOOT", update.getPlayers());
                 }
                 break;
-                
+
             case DAY_CHAT:
-                phaseDescriptionLabel.setText("Ngày - Thảo luận");
+                phaseDescriptionLabel.setText("NGAY - Thao luan");
                 break;
-                
+
             case DAY_VOTE:
-                phaseDescriptionLabel.setText("Ngày - Bỏ phiếu treo cổ");
-                // Nếu còn sống thì ưu tiên panel vote action, tránh chồng với voteResultPanel.
+                phaseDescriptionLabel.setText("NGAY - Bo phieu treo co");
                 if (update.isCanAct()) {
-                    showActionPanel("Chọn người để bỏ phiếu (có thể đổi vote):", "VOTE", update.getPlayers());
+                    showActionPanel("Chon nguoi de bo phieu (co the doi vote):", "VOTE", update.getPlayers());
                 } else if (update.getVotes() != null && !update.getVotes().isEmpty()) {
-                    // Người đã chết/chưa tới lượt thì xem kết quả realtime.
                     showVoteResults(update);
                 }
                 break;
-                
+
             case ENDED:
                 // Handled in handleGameEnd
                 break;
         }
     }
 
+    // ===================== ABILITY PANEL =====================
+
+    private void showAbilityPanel() {
+        if (specialAbilityPanel != null) {
+            specialAbilityPanel.setVisible(true);
+        }
+    }
+
+    private void hideAllAbilityButtons() {
+        if (specialAbilityPanel == null) return;
+        specialAbilityPanel.setVisible(false);
+        setButtonVisible(guardSelfBtn, false);
+        setButtonVisible(seerIntuitionBtn, false);
+        setButtonVisible(wolfFrameBtn, false);
+        setButtonVisible(witchReviveBtn, false);
+        setButtonVisible(witchSilenceBtn, false);
+    }
+
+    private void setButtonVisible(Button btn, boolean visible) {
+        if (btn != null) {
+            btn.setVisible(visible);
+            btn.setManaged(visible);
+        }
+    }
+
+    @FXML
+    private void handleGuardSelf() {
+        GameActionRequest req = new GameActionRequest("GUARD_SELF", 0);
+        networkClient.sendMessage(req);
+        setButtonVisible(guardSelfBtn, false);
+        showStatus("Da tu bao ve ban than dem nay!", false);
+    }
+
+    @FXML
+    private void handleSeerIntuition() {
+        // Hien thi target2List de chon nguoi thu 2
+        if (target2List != null) {
+            seerIntuitionMode = true;
+            List<PlayerDTO> alivePlayers = new ArrayList<>();
+            if (currentGameState != null && currentGameState.getPlayers() != null) {
+                for (PlayerDTO p : currentGameState.getPlayers()) {
+                    if (p.isAlive() && p.getUserId() != currentUser.getId()) {
+                        alivePlayers.add(p);
+                    }
+                }
+            }
+            target2List.getItems().setAll(alivePlayers);
+            target2List.setVisible(true);
+            actionDescriptionLabel.setText("Truc giac: Chon 2 nguoi (dach sach 1 + danh sach 2), roi nhan Xac nhan:");
+
+            // Override submit button
+            submitActionButton.setOnAction(e -> {
+                PlayerDTO t1 = targetList.getSelectionModel().getSelectedItem();
+                PlayerDTO t2 = target2List.getSelectionModel().getSelectedItem();
+                if (t1 != null && t2 != null && t1.getUserId() != t2.getUserId()) {
+                    GameActionRequest req = new GameActionRequest("SEER_INTUITION", t1.getUserId(), t2.getUserId());
+                    networkClient.sendMessage(req);
+                    actionPanel.setVisible(false);
+                    seerIntuitionMode = false;
+                    showStatus("Da dung Truc giac!", false);
+                } else {
+                    showStatus("Hay chon 2 nguoi khac nhau!", true);
+                }
+            });
+            setButtonVisible(seerIntuitionBtn, false);
+        }
+    }
+
+    @FXML
+    private void handleWolfFrame() {
+        PlayerDTO selected = targetList.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Frame '" + selected.getDisplayName() + "'? Tien tri se thay ho la Soi!", ButtonType.YES, ButtonType.NO);
+            confirm.setTitle("Xac nhan Frame");
+            confirm.setHeaderText("Ky nang: Frame nguoi");
+            confirm.showAndWait().ifPresent(btn -> {
+                if (btn == ButtonType.YES) {
+                    GameActionRequest req = new GameActionRequest("WOLF_FRAME", selected.getUserId());
+                    networkClient.sendMessage(req);
+                    setButtonVisible(wolfFrameBtn, false);
+                    showStatus("Da frame " + selected.getDisplayName() + "!", false);
+                }
+            });
+        } else {
+            showStatus("Hay chon nguoi muon frame truoc!", true);
+        }
+    }
+
+    @FXML
+    private void handleWitchRevive() {
+        // Hoi sinh nguoi bi giet dem nay (killedPlayerId)
+        if (currentGameState != null && currentGameState.getKilledPlayerId() != null) {
+            int killedId = currentGameState.getKilledPlayerId();
+            String name = findPlayerName(killedId, currentGameState.getPlayers());
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Hoi sinh tam '" + name + "'? Ho se noi duoc 1 luot roi chet.", ButtonType.YES, ButtonType.NO);
+            confirm.setTitle("Xac nhan Hoi sinh tam");
+            confirm.showAndWait().ifPresent(btn -> {
+                if (btn == ButtonType.YES) {
+                    GameActionRequest req = new GameActionRequest("WITCH_REVIVE", killedId);
+                    networkClient.sendMessage(req);
+                    setButtonVisible(witchReviveBtn, false);
+                    showStatus("Da hoi sinh tam " + name + "!", false);
+                }
+            });
+        } else {
+            showStatus("Khong co nguoi nao bi giet dem nay!", true);
+        }
+    }
+
+    @FXML
+    private void handleWitchSilence() {
+        PlayerDTO selected = targetList.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                "Cam chat '" + selected.getDisplayName() + "' trong luot ngay hom nay?", ButtonType.YES, ButtonType.NO);
+            confirm.setTitle("Xac nhan Cam chat");
+            confirm.showAndWait().ifPresent(btn -> {
+                if (btn == ButtonType.YES) {
+                    GameActionRequest req = new GameActionRequest("WITCH_SILENCE", selected.getUserId());
+                    networkClient.sendMessage(req);
+                    actionPanel.setVisible(false);
+                    showStatus("Da cam chat " + selected.getDisplayName() + "!", false);
+                }
+            });
+        } else {
+            showStatus("Hay chon nguoi muon cam chat!", true);
+        }
+    }
+
+    // ===================== ACTION PANEL =====================
+
     private void showActionPanel(String description, String action, List<PlayerDTO> players) {
         actionDescriptionLabel.setText(description);
         actionPanel.setVisible(true);
         voteResultPanel.setVisible(false);
-        
-        // Giữ selection hiện tại khi server push update mỗi giây
+
+        // Reset target2List
+        if (target2List != null) {
+            target2List.setVisible(false);
+        }
+
         PlayerDTO selectedBefore = targetList.getSelectionModel().getSelectedItem();
         Integer selectedUserId = selectedBefore != null ? selectedBefore.getUserId() : null;
 
-        // Filter players based on action
         List<PlayerDTO> filteredTargets = new ArrayList<>();
-        for (PlayerDTO player : players) {
-            if (action.equals("KILL")) {
-                // Wolves can only kill alive non-wolves
-                if (player.isAlive() && player.getRole() != Role.WEREWOLF &&
-                    player.getUserId() != currentUser.getId()) {
-                    filteredTargets.add(player);
-                }
-            } else if (action.equals("SEER_CHECK")) {
-                // Seer can check anyone alive except self
-                if (player.isAlive() && player.getUserId() != currentUser.getId()) {
-                    filteredTargets.add(player);
-                }
-            } else if (action.equals("VOTE")) {
-                // Vote for anyone alive except self
-                if (player.isAlive() && player.getUserId() != currentUser.getId()) {
-                    filteredTargets.add(player);
-                }
-            } else if (action.equals("GUARD_PROTECT")) {
-                // Guard can protect anyone alive (including self)
-                if (player.isAlive()) {
-                    filteredTargets.add(player);
-                }
-            } else if (action.equals("HUNTER_SHOOT")) {
-                // Hunter can drag any alive player except self
-                if (player.isAlive() && player.getUserId() != currentUser.getId()) {
-                    filteredTargets.add(player);
+        if (players != null) {
+            for (PlayerDTO player : players) {
+                if (action.equals("KILL")) {
+                    if (player.isAlive() && player.getRole() != Role.WEREWOLF &&
+                        player.getUserId() != currentUser.getId()) {
+                        filteredTargets.add(player);
+                    }
+                } else if (action.equals("SEER_CHECK")) {
+                    if (player.isAlive() && player.getUserId() != currentUser.getId()) {
+                        filteredTargets.add(player);
+                    }
+                } else if (action.equals("VOTE")) {
+                    if (player.isAlive() && player.getUserId() != currentUser.getId()) {
+                        filteredTargets.add(player);
+                    }
+                } else if (action.equals("GUARD_PROTECT")) {
+                    if (player.isAlive()) {
+                        filteredTargets.add(player);
+                    }
+                } else if (action.equals("HUNTER_SHOOT")) {
+                    if (player.isAlive() && player.getUserId() != currentUser.getId()) {
+                        filteredTargets.add(player);
+                    }
+                } else {
+                    if (player.isAlive()) {
+                        filteredTargets.add(player);
+                    }
                 }
             }
         }
@@ -379,76 +529,158 @@ public class GameController {
                 }
             }
         }
-        
+
         submitActionButton.setOnAction(e -> {
             PlayerDTO selected = targetList.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 GameActionRequest request = new GameActionRequest(action, selected.getUserId());
                 networkClient.sendMessage(request);
                 actionPanel.setVisible(false);
-                showStatus("Đã gửi hành động: " + action, false);
+                showStatus("Da gui hanh dong: " + action, false);
             }
         });
+    }
+
+    private void showWitchActionPanel(String killedName, GameStateUpdate update) {
+        actionPanel.setVisible(true);
+        voteResultPanel.setVisible(false);
+        if (target2List != null) target2List.setVisible(false);
+
+        if (killedName != null) {
+            actionDescriptionLabel.setText("Nguoi chet: " + killedName + ". Chat 'SAVE' de cuu, hoac chon nguoi de Doc/Cam chat (Nhan Xac nhan).");
+        } else {
+            actionDescriptionLabel.setText("Khong ai chet dem nay. Chon nguoi de Doc/Cam chat:");
+        }
+
+        List<PlayerDTO> alive = new ArrayList<>();
+        if (update.getPlayers() != null) {
+            for (PlayerDTO p : update.getPlayers()) {
+                if (p.isAlive() && p.getUserId() != currentUser.getId()) {
+                    alive.add(p);
+                }
+            }
+        }
+        targetList.getItems().setAll(alive);
+
+        submitActionButton.setOnAction(e -> {
+            PlayerDTO selected = targetList.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                ChoiceDialog<String> choiceDialog = new ChoiceDialog<>("Doc", "Doc", "Cam chat");
+                choiceDialog.setTitle("Chon ky nang");
+                choiceDialog.setHeaderText("Phu thuy chon ky nang cho " + selected.getDisplayName());
+                choiceDialog.setContentText("Ky nang:");
+                choiceDialog.showAndWait().ifPresent(choice -> {
+                    String act = "Doc".equals(choice) ? "WITCH_KILL" : "WITCH_SILENCE";
+                    GameActionRequest request = new GameActionRequest(act, selected.getUserId());
+                    networkClient.sendMessage(request);
+                });
+                actionPanel.setVisible(false);
+            }
+        });
+
+        // Witch special buttons
+        showAbilityPanel();
+        if (update.isWitchHasMiniRevive() && !update.isWitchMiniReviveUsed() && killedName != null) {
+            setButtonVisible(witchReviveBtn, true);
+        }
+        setButtonVisible(witchSilenceBtn, true); // Cam chat luon hien (dung nhu tuong tac)
     }
 
     private void showVoteResults(GameStateUpdate update) {
         actionPanel.setVisible(false);
         voteResultPanel.setVisible(true);
         StringBuilder result = new StringBuilder();
-        
         if (update.getVotes() != null) {
             for (Map.Entry<Integer, Integer> entry : update.getVotes().entrySet()) {
                 String playerName = findPlayerName(entry.getKey(), update.getPlayers());
-                result.append(playerName).append(": ").append(entry.getValue()).append(" phiếu\n");
+                result.append(playerName).append(": ").append(entry.getValue()).append(" phieu\n");
             }
         }
-        
         voteResultLabel.setText(result.toString());
     }
 
-    private void updateTurnInfo(GamePhase phase, GameStateUpdate update) {
-        if (turnInfoLabel == null) {
-            return;
+    // ===================== GAME END =====================
+
+    private void handleGameEnd(GameStateUpdate update) {
+        gameEndPanel.setVisible(true);
+        actionPanel.setVisible(false);
+        voteResultPanel.setVisible(false);
+
+        String winner = update.getWinnerTeam();
+        if ("VILLAGERS".equals(winner)) {
+            winnerLabel.setText("PHE DAN THANG!");
+            winnerLabel.setStyle("-fx-text-fill: #00cec9; -fx-font-size: 20px; -fx-font-weight: bold;");
+        } else if ("WEREWOLVES".equals(winner)) {
+            winnerLabel.setText("MA SOI THANG!");
+            winnerLabel.setStyle("-fx-text-fill: #d63031; -fx-font-size: 20px; -fx-font-weight: bold;");
         }
+    }
+
+    private void updateRewardPanel(UserProgressUpdate progressUpdate) {
+        if (progressUpdate == null || progressUpdate.getUser() == null) return;
+        UserDTO updated = progressUpdate.getUser();
+
+        // Tinh xp/coin gain tu GameStateUpdate neu co
+        int xpGained = 0, bonusXp = 0, coinsGained = 0;
+        if (currentGameState != null) {
+            xpGained = currentGameState.getXpGained();
+            bonusXp = currentGameState.getBonusXp();
+            coinsGained = currentGameState.getCoinsGained();
+        }
+
+        if (xpGainedLabel != null) {
+            xpGainedLabel.setText("+" + xpGained + " XP");
+        }
+        if (bonusXpLabel != null) {
+            bonusXpLabel.setText("+" + bonusXp + " XP");
+        }
+        if (coinsGainedLabel != null) {
+            coinsGainedLabel.setText("+" + coinsGained);
+        }
+
+        // Rank & progress bar
+        int level = updated.getLevel();
+        int totalXp = updated.getExperience();
+        RankSystem rank = RankSystem.fromLevel(level);
+
+        if (rankLabel != null) {
+            rankLabel.setText(rank.getIcon() + " " + rank.getDisplayName() + " (Lv." + level + ")");
+            rankLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: " + rank.getColor() + ";");
+        }
+
+        if (rank.getMaxLevel() != Integer.MAX_VALUE) {
+            int xpInLevel = RankSystem.xpInCurrentLevel(totalXp);
+            int xpNeeded = RankSystem.xpRequiredForLevel(level);
+            double progress = xpNeeded > 0 ? (double) xpInLevel / xpNeeded : 1.0;
+            if (xpProgressBar != null) xpProgressBar.setProgress(progress);
+            if (xpProgressLabel != null) xpProgressLabel.setText(xpInLevel + " / " + xpNeeded + " XP");
+        } else {
+            if (xpProgressBar != null) xpProgressBar.setProgress(1.0);
+            if (xpProgressLabel != null) xpProgressLabel.setText("MAX LEVEL");
+        }
+
+        if (rewardPanel != null) rewardPanel.setVisible(true);
+    }
+
+    // ===================== TURN INFO & CHAT =====================
+
+    private void updateTurnInfo(GamePhase phase, GameStateUpdate update) {
+        if (turnInfoLabel == null) return;
 
         String turnText;
         switch (phase) {
-            case WAITING:
-                turnText = "Đến lượt: Chờ chủ phòng bắt đầu game";
-                break;
-            case STARTING:
-                turnText = "Đến lượt: Hệ thống đang khởi động ván";
-                break;
-            case NIGHT_WOLF:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn (Ma Sói)" : "Đến lượt: Ma Sói";
-                break;
-            case NIGHT_GUARD:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn (Bảo vệ)" : "Đến lượt: Bảo vệ";
-                break;
-            case NIGHT_WITCH:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn (Phù thủy)" : "Đến lượt: Phù thủy";
-                break;
-            case NIGHT_SEER:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn (Tiên tri)" : "Đến lượt: Tiên tri";
-                break;
-            case DAY_ANNOUNCE:
-                turnText = "Đến lượt: Hệ thống công bố kết quả";
-                break;
-            case DAY_HUNTER:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn (Thợ Săn — báo thù!)" : "Đến lượt: Thợ Săn chọn người kéo theo";
-                break;
-            case DAY_CHAT:
-                turnText = "Đến lượt: Tất cả người sống thảo luận";
-                break;
-            case DAY_VOTE:
-                turnText = update.isCanAct() ? "Đến lượt: Bạn bỏ phiếu" : "Đang chờ kết quả vote";
-                break;
-            case ENDED:
-                turnText = "Đến lượt: Ván đã kết thúc";
-                break;
-            default:
-                turnText = "Đến lượt: Đang cập nhật...";
-                break;
+            case WAITING: turnText = "Den luot: Cho chu phong bat dau game"; break;
+            case STARTING: turnText = "Den luot: He thong dang khoi dong van"; break;
+            case NIGHT_WOLF: turnText = update.isCanAct() ? "Den luot: Ban (Ma Soi)" : "Den luot: Ma Soi"; break;
+            case NIGHT_GUARD: turnText = update.isCanAct() ? "Den luot: Ban (Bao ve)" : "Den luot: Bao ve"; break;
+            case NIGHT_WITCH: turnText = update.isCanAct() ? "Den luot: Ban (Phu thuy)" : "Den luot: Phu thuy"; break;
+            case NIGHT_SEER: turnText = update.isCanAct() ? "Den luot: Ban (Tien tri)" : "Den luot: Tien tri"; break;
+            case DAY_ANNOUNCE: turnText = "Den luot: He thong cong bo ket qua"; break;
+            case DAY_HUNTER: turnText = update.isCanAct() ? "Den luot: Ban (Tho San - bao thu!)" : "Den luot: Tho San chon nguoi keo theo"; break;
+            case DAY_CHAT: turnText = "Den luot: Tat ca nguoi song thao luan"; break;
+            case DAY_VOTE: turnText = update.isCanAct() ? "Den luot: Ban bo phieu" : "Dang cho ket qua vote"; break;
+            case ENDED: turnText = "Den luot: Van da ket thuc"; break;
+            default: turnText = "Den luot: Dang cap nhat..."; break;
         }
 
         turnInfoLabel.setText(turnText);
@@ -464,157 +696,23 @@ public class GameController {
     }
 
     private void maybeLogPhaseToChat(GamePhase phase, GameStateUpdate update) {
-        if (chatArea == null || phase == null) {
-            return;
-        }
-        if (phase == lastChatPhase) {
-            return;
-        }
+        if (chatArea == null || phase == null || phase == lastChatPhase) return;
         lastChatPhase = phase;
         String time = new SimpleDateFormat("HH:mm:ss").format(new Date());
-        String detail = buildTurnDetailForChat(phase, update);
-        chatArea.appendText(String.format("[%s] [Lượt] Vòng %d — %s — %s\n",
-            time, update.getRoundNumber(), phase.getDisplayName(), detail));
+        chatArea.appendText(String.format("[%s] [Luot] Vong %d - %s\n",
+            time, update.getRoundNumber(), phase.getDisplayName()));
         chatArea.setScrollTop(Double.MAX_VALUE);
-    }
-
-    private String buildTurnDetailForChat(GamePhase phase, GameStateUpdate update) {
-        switch (phase) {
-            case WAITING:
-                return "Chờ trong phòng";
-            case STARTING:
-                return "Khởi động ván";
-            case NIGHT_WOLF:
-                return update.isCanAct() ? "Tới lượt bạn (Ma Sói)" : "Tới lượt Ma Sói";
-            case NIGHT_GUARD:
-                return update.isCanAct() ? "Tới lượt bạn (Bảo vệ)" : "Tới lượt Bảo vệ";
-            case NIGHT_WITCH:
-                return update.isCanAct() ? "Tới lượt bạn (Phù thủy)" : "Tới lượt Phù thủy";
-            case NIGHT_SEER:
-                return update.isCanAct() ? "Tới lượt bạn (Tiên tri)" : "Tới lượt Tiên tri";
-            case DAY_ANNOUNCE:
-                return "Hệ thống công bố kết quả";
-            case DAY_HUNTER:
-                return update.isCanAct() ? "Tới lượt bạn (Thợ Săn — báo thù)" : "Thợ Săn đang chọn người kéo theo";
-            case DAY_CHAT:
-                return "Mọi người sống được thảo luận";
-            case DAY_VOTE:
-                return update.isCanAct() ? "Tới lượt bạn bỏ phiếu" : "Chờ kết quả vote";
-            case ENDED:
-                return "Ván kết thúc";
-            default:
-                return "";
-        }
-    }
-
-    private void showWitchActionPanel(String killedName) {
-        actionPanel.setVisible(true);
-        voteResultPanel.setVisible(false);
-        actionDescriptionLabel.setText(killedName != null ? 
-            "Người chết: " + killedName + ". Bạn muốn cứu không?" : 
-            "Không ai chết đêm nay.");
-
-        targetList.getItems().clear();
-        
-        // Simplified Map: Use target list for KILL, specific button for SAVE
-        // BUT current UI structure is rigid (Description + List + Submit).
-        // Reuse: 
-        // If killedName != null: Description asks "Save?". List contains "YES (SAVE)" and then other players to KILL?
-        
-        // Better: Just use list.
-        if (killedName != null) {
-            // Add a "Dummy" player representing the Save action? Or just button?
-            // Reusing existing submitActionButton is tricky.
-            
-            // Let's modify actionDescriptionLabel to include instructions
-            actionDescriptionLabel.setText("Người chết: " + killedName + ". Chat 'SAVE' để cứu, hoặc chọn người dưới để Độc/Câm chat.");
-        } else {
-            actionDescriptionLabel.setText("Chọn người để dùng thuốc độc hoặc câm chat:");
-        }
-        
-        for (PlayerDTO player : currentGameState.getPlayers()) {
-            if (player.isAlive() && player.getUserId() != currentUser.getId()) {
-                targetList.getItems().add(player);
-            }
-        }
-        
-        // Override button action
-        submitActionButton.setOnAction(e -> {
-             PlayerDTO selected = targetList.getSelectionModel().getSelectedItem();
-             if (selected != null) {
-                 ChoiceDialog<String> choiceDialog = new ChoiceDialog<>("Độc", "Độc", "Câm chat");
-                 choiceDialog.setTitle("Chọn kỹ năng");
-                 choiceDialog.setHeaderText("Phù thủy chọn kỹ năng cho " + selected.getDisplayName());
-                 choiceDialog.setContentText("Kỹ năng:");
-                 choiceDialog.showAndWait().ifPresent(choice -> {
-                     String action = "Độc".equals(choice) ? "WITCH_KILL" : "WITCH_SILENCE";
-                     GameActionRequest request = new GameActionRequest(action, selected.getUserId());
-                     networkClient.sendMessage(request);
-                 });
-                 actionPanel.setVisible(false);
-             }
-        });
-        
-        // Note: Real Witch UI needs 2 buttons (Save/Kill). 
-        // For MVP, we might rely on text commands or simpler logic.
-        // Let's implement chat commands in handleSendChat to support "SAVE" if it's Witch phase?
-        // Or update showActionPanel logic to be flexible.
     }
 
     private String findPlayerName(int userId, List<PlayerDTO> players) {
         if (players == null) return "Unknown";
         for (PlayerDTO player : players) {
-            if (player.getUserId() == userId) {
-                return player.getDisplayName();
-            }
+            if (player.getUserId() == userId) return player.getDisplayName();
         }
         return "Unknown";
     }
 
-    private void handleGameEnd(GameStateUpdate update) {
-        gameEndPanel.setVisible(true);
-        actionPanel.setVisible(false);
-        voteResultPanel.setVisible(false);
-        
-        String winner = update.getWinnerTeam();
-        if ("VILLAGERS".equals(winner)) {
-            winnerLabel.setText("Dân làng thắng!");
-            winnerLabel.setStyle("-fx-text-fill: green; -fx-font-size: 18px; -fx-font-weight: bold;");
-        } else if ("WEREWOLVES".equals(winner)) {
-            winnerLabel.setText("Ma Sói thắng!");
-            winnerLabel.setStyle("-fx-text-fill: red; -fx-font-size: 18px; -fx-font-weight: bold;");
-        }
-    }
-
-    @FXML
-    private void handleSubmitAction() {
-        // Handled in showActionPanel
-    }
-
-    @FXML
-    private void handleSendChat() {
-        String message = chatInput.getText().trim();
-        if (message.isEmpty()) return;
-        
-        // Hacky: Witch SAVE command via chat
-        if (myRole == Role.WITCH && "SAVE".equalsIgnoreCase(message) && currentGameState.getPhase() == GamePhase.NIGHT_WITCH) {
-             GameActionRequest request = new GameActionRequest("SAVE", 0); // TargetId ignored for save
-             networkClient.sendMessage(request);
-             chatInput.clear();
-             showStatus("Đã dùng bình cứu!", false);
-             actionPanel.setVisible(false);
-             return;
-        }
-
-        ChatRequest request = new ChatRequest(message);
-        networkClient.sendMessage(request);
-        chatInput.clear();
-    }
-
-    @FXML
-    private void handleBackToMain() {
-        loadMainScreen();
-    }
+    // ===================== SERVER MESSAGE HANDLERS =====================
 
     private void handleServerMessage(Message message) {
         switch (message.getType()) {
@@ -639,33 +737,63 @@ public class GameController {
     private void handleUserProgressUpdate(UserProgressUpdate update) {
         if (update == null || update.getUser() == null) return;
         this.currentUser = update.getUser();
-        // Khi nhận progression mới, cập nhật lại label hiển thị của màn chính sau khi user quay về.
-        showStatus("Đã cập nhật rank/XP/coin!", false);
+        updateRewardPanel(update);
+        showStatus("Da cap nhat rank/XP/coin!", false);
     }
 
     private void handleChatMessage(ChatMessage message) {
         String time = new SimpleDateFormat("HH:mm:ss").format(new Date(message.getTimestamp()));
-        String displayText = String.format("[%s] %s: %s\n", 
-            time, message.getDisplayName(), message.getContent());
-        chatArea.appendText(displayText);
+        chatArea.appendText(String.format("[%s] %s: %s\n", time, message.getDisplayName(), message.getContent()));
     }
 
     private void handleSystemMessage(SystemMessage message) {
         String time = new SimpleDateFormat("HH:mm:ss").format(new Date());
-        String displayText = String.format("[%s] [Hệ thống] %s\n", time, message.getContent());
-        chatArea.appendText(displayText);
+        chatArea.appendText(String.format("[%s] [He thong] %s\n", time, message.getContent()));
         showStatus(message.getContent(), false);
     }
 
     private void handleErrorResponse(ErrorResponse response) {
-        showStatus("Lỗi: " + response.getErrorMessage(), true);
+        showStatus("Loi: " + response.getErrorMessage(), true);
+    }
+
+    // ===================== FXML ACTIONS =====================
+
+    @FXML
+    private void handleSubmitAction() {
+        // Handled by submitActionButton.setOnAction(...)
+    }
+
+    @FXML
+    private void handleSendChat() {
+        String message = chatInput.getText().trim();
+        if (message.isEmpty()) return;
+
+        // Witch SAVE command via chat
+        if (myRole == Role.WITCH && "SAVE".equalsIgnoreCase(message) &&
+            currentGameState != null && currentGameState.getPhase() == GamePhase.NIGHT_WITCH) {
+            GameActionRequest request = new GameActionRequest("WITCH_SAVE", 0);
+            networkClient.sendMessage(request);
+            chatInput.clear();
+            showStatus("Da dung binh cuu!", false);
+            actionPanel.setVisible(false);
+            return;
+        }
+
+        ChatRequest request = new ChatRequest(message);
+        networkClient.sendMessage(request);
+        chatInput.clear();
+    }
+
+    @FXML
+    private void handleBackToMain() {
+        loadMainScreen();
     }
 
     private void loadMainScreen() {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/main.fxml"));
             Parent root = loader.load();
-            
+
             MainScreenController controller = loader.getController();
             controller.setNetworkClient(networkClient);
             controller.setStage(stage);
@@ -675,7 +803,7 @@ public class GameController {
             Scene mainScene = new Scene(root, 800, 600);
             applyTheme(mainScene);
             stage.setScene(mainScene);
-            stage.setTitle("Werewolf Game - Danh sách phòng");
+            stage.setTitle("Werewolf Game - Danh sach phong");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -684,10 +812,6 @@ public class GameController {
     private void showStatus(String message, boolean isError) {
         statusLabel.setText(message);
         statusLabel.getStyleClass().removeAll("status-error", "status-success");
-        if (isError) {
-            statusLabel.getStyleClass().add("status-error");
-        } else {
-            statusLabel.getStyleClass().add("status-success");
-        }
+        statusLabel.getStyleClass().add(isError ? "status-error" : "status-success");
     }
 }

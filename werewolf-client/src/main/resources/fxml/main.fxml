@@ -3,46 +3,114 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
 
 <StackPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.werewolf.client.ui.MainScreenController"
            styleClass="root app-bg">
 
 <BorderPane styleClass="app-shell">
-   
+
+   <!-- TOP NAV BAR -->
    <top>
-      <HBox spacing="10" alignment="CENTER_LEFT" styleClass="top-bar">
-         <Label fx:id="userInfoLabel" text="Xin chào, " styleClass="logo-title"/>
+      <HBox spacing="14" alignment="CENTER_LEFT" styleClass="top-bar">
+
+         <!-- Logo mark -->
+         <StackPane minWidth="40" minHeight="40">
+             <Circle radius="20"
+                     style="-fx-fill: linear-gradient(to bottom right, rgba(130,60,255,0.28), rgba(180,20,60,0.20));
+                            -fx-stroke: rgba(140,80,255,0.38); -fx-stroke-width: 1.5;
+                            -fx-effect: dropshadow(gaussian, rgba(130,60,255,0.65), 18, 0, 0, 0);"/>
+             <Label text="M"
+                    style="-fx-font-size: 18px; -fx-font-weight: 900; -fx-text-fill: white;
+                           -fx-effect: dropshadow(gaussian, rgba(255,255,255,0.20), 6, 0, 0, 0);"/>
+         </StackPane>
+
+         <!-- App name -->
+         <VBox spacing="1" alignment="CENTER_LEFT">
+             <Label text="MA SÓI ONLINE"
+                    style="-fx-font-size: 15px; -fx-font-weight: 900; -fx-text-fill: #ede9fe;
+                           -fx-letter-spacing: 1px;"/>
+             <Label text="Đấu trí — Sinh tồn — Chinh phục"
+                    style="-fx-font-size: 10px; -fx-text-fill: rgba(196,181,253,0.42);"/>
+         </VBox>
+
          <Region HBox.hgrow="ALWAYS"/>
-         <Button fx:id="refreshButton" text="Làm mới" onAction="#handleRefresh" styleClass="button small"/>
-         <Button fx:id="logoutButton" text="Đăng xuất" onAction="#handleLogout" styleClass="button danger small"/>
+
+         <!-- User info pill -->
+         <HBox spacing="10" alignment="CENTER"
+               style="-fx-background-color: rgba(130,60,255,0.10);
+                      -fx-background-radius: 30; -fx-border-color: rgba(130,80,230,0.22);
+                      -fx-border-width: 1; -fx-border-radius: 30;
+                      -fx-padding: 7 18 7 12;">
+             <Circle radius="9"
+                     style="-fx-fill: linear-gradient(to bottom right, rgba(130,60,255,0.60), rgba(180,20,60,0.50));
+                            -fx-stroke: rgba(255,255,255,0.18); -fx-stroke-width: 1.2;"/>
+             <Label text="Xin chào," style="-fx-text-fill: rgba(196,181,253,0.50); -fx-font-size: 12px;"/>
+             <Label fx:id="userInfoLabel" text="Người chơi"
+                    style="-fx-font-weight: 800; -fx-font-size: 13px; -fx-text-fill: #fbbf24;"/>
+         </HBox>
+
+         <!-- Action buttons -->
+         <Button fx:id="refreshButton" text="↻  Làm mới" onAction="#handleRefresh"
+                 styleClass="button icon-btn small"/>
+         <Button fx:id="logoutButton" text="Đăng xuất" onAction="#handleLogout"
+                 styleClass="button danger small"/>
       </HBox>
    </top>
-   
-   <center>
-      <VBox spacing="14" styleClass="card">
-         <padding><Insets top="14" right="14" bottom="14" left="14"/></padding>
 
-         <HBox spacing="10" alignment="CENTER_LEFT">
-            <Label text="Danh sách phòng" styleClass="header-label" style="-fx-font-size: 18px;"/>
+   <!-- MAIN CONTENT -->
+   <center>
+      <VBox spacing="16" styleClass="card">
+         <padding><Insets top="20" right="20" bottom="20" left="20"/></padding>
+
+         <!-- Section header -->
+         <HBox spacing="12" alignment="CENTER_LEFT">
+            <VBox spacing="4">
+                <Label text="DANH SÁCH PHÒNG" styleClass="section-label"/>
+                <Label text="Chọn phòng để tham gia hoặc tạo phòng mới để bắt đầu hành trình"
+                       style="-fx-font-size: 12px; -fx-text-fill: rgba(196,181,253,0.42);"/>
+            </VBox>
             <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="createRoomButton" text="Tạo phòng mới" onAction="#handleCreateRoom" 
-                    styleClass="button success"/>
+            <Button fx:id="createRoomButton" text="＋  Tạo Phòng Mới" onAction="#handleCreateRoom"
+                    styleClass="button success" style="-fx-font-size: 13px; -fx-padding: 10 18;"/>
          </HBox>
-         
-         <TableView fx:id="roomTable" prefHeight="400" VBox.vgrow="ALWAYS">
+
+         <!-- Thin accent divider -->
+         <Region styleClass="divider-accent" maxWidth="Infinity"/>
+
+         <!-- Room Table -->
+         <TableView fx:id="roomTable" VBox.vgrow="ALWAYS" style="-fx-font-size: 13px;">
             <columns>
-               <TableColumn fx:id="idColumn" text="ID" prefWidth="50"/>
-               <TableColumn fx:id="nameColumn" text="Tên phòng" prefWidth="200"/>
-               <TableColumn fx:id="hostColumn" text="Chủ phòng" prefWidth="150"/>
-               <TableColumn fx:id="playersColumn" text="Người chơi" prefWidth="100"/>
-               <TableColumn fx:id="statusColumn" text="Trạng thái" prefWidth="100"/>
-               <TableColumn fx:id="actionColumn" text="Thao tác" prefWidth="100"/>
+               <TableColumn fx:id="idColumn" text="ID" prefWidth="52" style="-fx-alignment: CENTER;"/>
+               <TableColumn fx:id="nameColumn" text="Tên Phòng" prefWidth="220"/>
+               <TableColumn fx:id="hostColumn" text="Chủ Phòng" prefWidth="155"/>
+               <TableColumn fx:id="playersColumn" text="Người Chơi" prefWidth="100" style="-fx-alignment: CENTER;"/>
+               <TableColumn fx:id="statusColumn" text="Trạng Thái" prefWidth="115" style="-fx-alignment: CENTER;"/>
+               <TableColumn fx:id="actionColumn" text="Tham Gia" prefWidth="105" style="-fx-alignment: CENTER;"/>
             </columns>
+            <placeholder>
+                <VBox alignment="CENTER" spacing="12">
+                    <Label text="🐺" style="-fx-font-size: 36px; -fx-opacity: 0.35;"/>
+                    <Label text="Chưa có phòng nào — hãy tạo phòng mới!"
+                           style="-fx-text-fill: rgba(196,181,253,0.40); -fx-font-size: 14px;"/>
+                    <Label text="Nhấn 'Làm mới' nếu bạn vừa tham gia"
+                           style="-fx-text-fill: rgba(196,181,253,0.25); -fx-font-size: 12px;"/>
+                </VBox>
+            </placeholder>
          </TableView>
-         
-         <Label fx:id="statusLabel" text="" styleClass="muted"/>
+
+         <!-- Status bar -->
+         <HBox alignment="CENTER_LEFT" spacing="8"
+               style="-fx-padding: 4 4 0 4;">
+             <Circle radius="4"
+                     style="-fx-fill: #34d399; -fx-effect: dropshadow(gaussian, rgba(52,211,153,0.65), 6, 0, 0, 0);"/>
+             <Label text="Kết nối:" style="-fx-text-fill: rgba(196,181,253,0.35); -fx-font-size: 11px;"/>
+             <Label fx:id="statusLabel" text="Sẵn sàng"
+                    styleClass="status-success" style="-fx-font-size: 11px;"/>
+         </HBox>
       </VBox>
    </center>
+
 </BorderPane>
 </StackPane>

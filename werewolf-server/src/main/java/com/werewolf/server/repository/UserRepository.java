@@ -2,9 +2,10 @@ package com.werewolf.server.repository;
 
 import com.werewolf.server.config.DatabaseConfig;
 import com.werewolf.server.entity.User;
+import com.werewolf.server.service.ProgressionService;
 
 import java.sql.*;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Repository để thao tác với bảng users
@@ -66,40 +67,78 @@ public class UserRepository {
         }
     }
 
-    public void applyMatchRewards(Set<Integer> winnerUserIds, Set<Integer> participantUserIds) {
-        if (participantUserIds == null || participantUserIds.isEmpty()) {
-            return;
-        }
-        final int loseXp = 20;
-        final int winXp = 50;
-        final int loseCoins = 10;
-        final int winCoins = 30;
+    /**
+     * Áp dụng phần thưởng chi tiết (dùng với ProgressionService)
+     */
+    public void applyMatchRewardsDetailed(Map<Integer, ProgressionService.RewardResult> rewards) {
+        if (rewards == null || rewards.isEmpty()) return;
 
+        // Công thức level: levelFromTotalXp() dùng RankSystem
+        // Cập nhật: experience += totalXp, coins += coins, games_played++, games_won += (won?1:0)
+        // Sau đó tính lại level từ experience mới
         String sql = "UPDATE users SET " +
                 "games_played = games_played + 1, " +
                 "games_won = games_won + ?, " +
                 "experience = experience + ?, " +
                 "coins = coins + ?, " +
-                "level = 1 + FLOOR((experience + ?) / 100) " +
+                "level = CASE " +
+                "  WHEN (experience + ?) < 100   THEN 1 " +
+                "  WHEN (experience + ?) < 300   THEN 2 " +
+                "  WHEN (experience + ?) < 600   THEN 3 " +
+                "  WHEN (experience + ?) < 1000  THEN 4 " +
+                "  WHEN (experience + ?) < 1500  THEN 5 " +
+                "  WHEN (experience + ?) < 2100  THEN 6 " +
+                "  WHEN (experience + ?) < 2800  THEN 7 " +
+                "  WHEN (experience + ?) < 3600  THEN 8 " +
+                "  WHEN (experience + ?) < 4500  THEN 9 " +
+                "  WHEN (experience + ?) < 5500  THEN 10 " +
+                "  WHEN (experience + ?) < 7000  THEN 11 " +
+                "  WHEN (experience + ?) < 8700  THEN 12 " +
+                "  WHEN (experience + ?) < 10600 THEN 13 " +
+                "  WHEN (experience + ?) < 12700 THEN 14 " +
+                "  WHEN (experience + ?) < 15000 THEN 15 " +
+                "  WHEN (experience + ?) < 20000 THEN 20 " +
+                "  WHEN (experience + ?) < 30000 THEN 30 " +
+                "  ELSE 50 " +
+                "END " +
                 "WHERE id = ?";
 
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            for (Integer userId : participantUserIds) {
-                boolean isWinner = winnerUserIds != null && winnerUserIds.contains(userId);
-                int xpGain = isWinner ? winXp : loseXp;
-                int coinGain = isWinner ? winCoins : loseCoins;
-                stmt.setInt(1, isWinner ? 1 : 0);
-                stmt.setInt(2, xpGain);
-                stmt.setInt(3, coinGain);
-                stmt.setInt(4, xpGain);
-                stmt.setInt(5, userId);
+            for (ProgressionService.RewardResult r : rewards.values()) {
+                int totalXp = r.getTotalXp();
+                int paramIdx = 1;
+                stmt.setInt(paramIdx++, r.won ? 1 : 0);
+                stmt.setInt(paramIdx++, totalXp);
+                stmt.setInt(paramIdx++, r.coinsGained);
+                // Level CASE: 19 cột xp cần điền
+                for (int i = 0; i < 19; i++) {
+                    stmt.setInt(paramIdx++, totalXp);
+                }
+                stmt.setInt(paramIdx, r.userId);
                 stmt.addBatch();
             }
             stmt.executeBatch();
         } catch (SQLException e) {
-            throw new RuntimeException("Lỗi cập nhật phần thưởng trận đấu", e);
+            throw new RuntimeException("Lỗi cập nhật phần thưởng chi tiết", e);
         }
+    }
+
+    /**
+     * Lấy XP hiện tại của user (dùng sau khi cập nhật để tính rank mới)
+     */
+    public int getExperienceById(int userId) {
+        String sql = "SELECT experience FROM users WHERE id = ?";
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt("experience");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Lỗi lấy XP", e);
+        }
+        return 0;
     }
 
     public void updateOnlineStatus(int userId, boolean online) {

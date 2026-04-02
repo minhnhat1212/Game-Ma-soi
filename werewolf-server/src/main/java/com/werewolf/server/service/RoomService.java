@@ -201,7 +201,17 @@ public class RoomService {
         // TODO: Query từ DB thay vì chỉ lấy từ cache
         List<RoomDTO> result = new ArrayList<>();
         for (Room room : activeRooms.values()) {
-            if (filter == null || filter.isEmpty() || room.getStatus().equals(filter)) {
+            String status = room.getStatus();
+
+            // Mặc định không hiện phòng đã kết thúc ở sảnh để tránh "phòng rác".
+            if (filter == null || filter.isEmpty()) {
+                if (!"ENDED".equals(status)) {
+                    result.add(toDTO(room));
+                }
+                continue;
+            }
+
+            if (status.equals(filter)) {
                 result.add(toDTO(room));
             }
         }

@@ -29,9 +29,9 @@ public enum Role {
     }
 
     /**
-     * Kiểm tra vai trò có phải dân không
+     * Kiểm tra vai trò có phải dân không (tất cả phe dân)
      */
     public boolean isVillager() {
-        return this == VILLAGER || this == SEER;
+        return this == VILLAGER || this == SEER || this == GUARD || this == WITCH || this == HUNTER;
     }
 }
